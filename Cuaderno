@@ -1,0 +1,229 @@
+# Importamos las librerías necesarias
+import pandas as pd
+import numpy as np
+
+# MÉTODO NO SUPERVISADO
+#CLUSTERING
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler
+#pip install statsmodels desde el Clusters
+import statsmodels as sm
+import seaborn as sns
+import matplotlib.pyplot as plt
+%matplotlib inline
+#pip install mlxtend desde el Clusters (logaritmo Apriori)
+
+#MÉTODO SUPERVISADO 
+#GBT - Regresión y Clasificación + Evañuación de modelos
+import xgboost as xgb
+#pip install xgboost
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import auc, accuracy_score, confusion_matrix, mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+# Leemos el documento csv #demographic desde la función Pandas (pd.read_csv)
+pd.read_csv("/dbfs/FileStore/tables/demographic.csv")
+# Asignamos el DataFrame a una variable (demographic_df)
+demographic_df = pd.read_csv("/dbfs/FileStore/tables/demographic.csv")
+
+# Usamos la función dtypes para analizar qué contiene el DataFrame health_df
+demographic_df.dtypes
+#Comprobamos el porcentaje de NaNs
+demographic_df.isna().sum() * 100 / len(demographic_df)
+# Comprobamos las columnas para poder hacer una análisis de datos descriptivo
+demographic_df.columns
+# Eliminamos las columnas que no nos aportan información. En nuestro caso: SDDSRVYR', RIDAGEMN y RIDEXAGM.
+demographic1_df=demographic_df.drop (['SDDSRVYR', 'RIDAGEMN', 'RIDEXAGM', 'DMDCITZN','DMDYRSUS','DMDEDUC3','DMDEDUC2','DMDMARTL','SIAPROXY','SIAINTRP','FIALANG','FIAPROXY','FIAINTRP','MIALANG','MIAPROXY','MIAINTRP','AIALANGA','DMDHRGND','DMDHRAGE','DMDHRBR4','DMDHREDU','DMDHRMAR','DMDHSEDU','WTINT2YR','WTMEC2YR','SDMVPSU','SDMVSTRA','INDFMIN2', 'DMQADFC', 'RIDEXMON'], axis=1)
+demographic1_df.columns
+Out[278]: Index(['SEQN', 'RIDSTATR', 'RIAGENDR', 'RIDAGEYR', 'RIDRETH1', 'RIDRETH3',
+       'DMQMILIZ', 'DMDBORN4', 'RIDEXPRG', 'SIALANG', 'DMDHHSIZ', 'DMDFMSIZ',
+       'DMDHHSZA', 'DMDHHSZB', 'DMDHHSZE', 'INDHHIN2', 'INDFMPIR'],
+      dtype='object')
+#Modificamos el nombre de las cabeceras
+demographic2_df=demographic1_df.rename(columns={'SEQN':'id', 'RIDSTATR':'estado', 'RIAGENDR':'genero', 'RIDAGEYR':'edad', 'RIDRETH1':'razahisp','RIDRETH3':'razasiat','DMQMILIZ':'farmadas','DMDBORN4':'nacimiento','RIDEXPRG':'embarazo','SIALANG':'idioma','DMDHHSIZ':'personas.hogar','DMDFMSIZ':'num fam','DMDHHSZA':'>5a','DMDHHSZB':'>6<17a','DMDHHSZE':'>60a','INDHHIN2':'ingresos.dol','INDFMPIR':'ratio'})
+demographic2_df.columns
+Out[279]: Index(['id', 'estado', 'genero', 'edad', 'razahisp', 'razasiat', 'farmadas',
+       'nacimiento', 'embarazo', 'idioma', 'personas.hogar', 'num fam', '>5a',
+       '>6<17a', '>60a', 'ingresos.dol', 'ratio'],
+      dtype='object')
+# Hacemos un análisis descriptivo de los datos 
+# Comprobamos y visualizamos las dimensiones de demographic_df
+print(demographic2_df)
+          id  estado  genero  edad  ...  >6<17a  >60a  ingresos.dol  ratio
+0      73557       2       1    69  ...       0     2           4.0   0.84
+1      73558       2       1    54  ...       2     0           7.0   1.78
+2      73559       2       1    72  ...       0     2          10.0   4.51
+3      73560       2       1     9  ...       2     0           9.0   2.52
+4      73561       2       2    73  ...       0     2          15.0   5.00
+...      ...     ...     ...   ...  ...     ...   ...           ...    ...
+10170  83727       2       1    26  ...       0     0          77.0    NaN
+10171  83728       2       2     2  ...       1     0           8.0   1.95
+10172  83729       2       2    42  ...       0     0           7.0   3.66
+10173  83730       2       1     7  ...       1     0           6.0   1.05
+10174  83731       2       1    11  ...       2     0          15.0   5.00
+
+[10175 rows x 17 columns]
+# Mostramos las 20 primeras columnas
+print (demographic2_df.head(20))
+       id  estado  genero  edad  ...  >6<17a  >60a  ingresos.dol  ratio
+0   73557       2       1    69  ...       0     2           4.0   0.84
+1   73558       2       1    54  ...       2     0           7.0   1.78
+2   73559       2       1    72  ...       0     2          10.0   4.51
+3   73560       2       1     9  ...       2     0           9.0   2.52
+4   73561       2       2    73  ...       0     2          15.0   5.00
+5   73562       2       1    56  ...       0     0           9.0   4.79
+6   73563       2       1     0  ...       0     0          15.0   5.00
+7   73564       2       2    61  ...       0     1          10.0   5.00
+8   73565       1       1    42  ...       1     0          15.0   5.00
+9   73566       2       2    56  ...       0     0           4.0   0.48
+10  73567       2       1    65  ...       0     1           3.0   1.20
+11  73568       2       2    26  ...       0     0          15.0   5.00
+12  73569       1       2     0  ...       0     0          77.0    NaN
+13  73570       2       2     9  ...       3     0           5.0   0.84
+14  73571       2       1    76  ...       0     2          14.0   5.00
+15  73572       2       2    10  ...       2     0           2.0   0.41
+16  73573       2       1    10  ...       2     0           8.0   1.79
+17  73574       2       2    33  ...       1     0           8.0   2.10
+18  73575       2       1     1  ...       0     0           3.0   0.76
+19  73576       2       1    16  ...       2     0           8.0   1.58
+
+[20 rows x 17 columns]
+demographic2_df
+Out[282]: 
+
+# Descripción del df
+print (demographic2_df.describe())
+                 id        estado  ...  ingresos.dol        ratio
+count  10175.000000  10175.000000  ...  10042.000000  9390.000000
+mean   78644.000000      1.964423  ...     10.884983     2.252153
+std     2937.413829      0.185243  ...     13.878864     1.634907
+min    73557.000000      1.000000  ...      1.000000     0.000000
+25%    76100.500000      2.000000  ...      5.000000     0.870000
+50%    78644.000000      2.000000  ...      8.000000     1.705000
+75%    81187.500000      2.000000  ...     14.000000     3.607500
+max    83731.000000      2.000000  ...     99.000000     5.000000
+
+[8 rows x 17 columns]
+# Analizamos frecuencias e interacciones 
+#pip install pandas-profiling - No es necesario en Databricks, instalado directamente en el cluster
+import pandas_profiling
+profile = pandas_profiling.ProfileReport(demographic2_df)
+profile.to_file('/dbfs/FileStore/reportdemographic2.html')
+display(dbutils.fs.ls("dbfs:/FileStore"))
+#displayHTML(profile.to_html())
+# Datos agrupados por sexo: se pretende analizar la influencia del sexo en cada una de las variables
+grouped_data = demographic2_df.groupby('genero')
+
+# Estadísticas para todas las columnas numéricas por sexo
+grouped_data.describe()
+# Representamos gráficamente el género frente a la raza e ingresos para su visualización
+from pylab import *
+display(demographic2_df)
+# Devuelve la media de cada columna numérica por sexo
+grouped_data.mean()
+grouped1_data = demographic2_df.groupby(['genero', 'edad'])
+grouped1_data.first ()
+# Datos agrupados por étnia: se pretende analizar la influencia de la raza en cada una de las variables, prestando especial atención en los ingresos y ratio de pobreza
+grouped2_data = demographic2_df.groupby('razahisp')
+
+# Estadísticas para todas las columnas numéricas por etnia
+grouped2_data.mean()
+# Leemos el documento csv #diet desde la función Pandas (pd.read_csv)
+pd.read_csv("/dbfs/FileStore/tables/diet.csv")
+diet_df = pd.read_csv("/dbfs/FileStore/tables/diet.csv")
+diet_df.head()
+diet_df.columns
+Out[291]: Index(['SEQN', 'WTDRD1', 'WTDR2D', 'DR1DRSTZ', 'DR1EXMER', 'DRABF', 'DRDINT',
+       'DR1DBIH', 'DR1DAY', 'DR1LANG',
+       ...
+       'DRD370QQ', 'DRD370R', 'DRD370RQ', 'DRD370S', 'DRD370SQ', 'DRD370T',
+       'DRD370TQ', 'DRD370U', 'DRD370UQ', 'DRD370V'],
+      dtype='object', length=168)
+      diet1_df=diet_df.drop (['DR1.320Z', 'DR1.300', 'DR1TP226', 'DR1TP225', 'DR1TP205', 'DR1TP204', 'DR1TP184', 'DR1TP183', 'DR1TP182', 'DR1TM161', 'DR1TM181', 'DR1TM201', 'DR1TM221', 'DR1TFDFE', 'DR1TS040', 'DR1TS060', 'DR1TS080', 'DR1TS100', 'DR1TS120', 'DR1TS140', 'DR1TS160', 'DR1TS180', 'DR1TB12A', 'DR1TIRON', 'DR1TTHEO', 'DR1TCOPP', 'DR1TCHL', 'DR1DRSTZ', 'DR1TCRYP', 'DR1TLYCO', 'DR1TLZ', 'DR1TVB1', 'DR1TVB2', 'DR1TNIAC', 'DR1TFOLA', 'DR1TFF', 'DR1TSFAT', 'DR1TMFAT', 'DR1DAY', 'DR1TPFAT', 'DR1LANG', 'DR1EXMER', 'DR1.330Z', 'DRABF', 'DRDINT', 'DR1DBIH', 'DR1MNRSP', 'DR1HELPD', 'DBQ095Z', 'DBD100', 'DRQSPREP', 'DR1STY', 'DR1SKY', 'DRQSDT1', 'DRQSDT2', 'DRQSDT3', 'DRQSDT4', 'DRQSDT5', 'DRQSDT6', 'DRQSDT7', 'DRQSDT8', 'DRQSDT9', 'DRQSDT10', 'DRQSDT11', 'DRQSDT12', 'DRQSDT91', 'DR1TATOA', 'DR1BWATZ', 'DR1TWS', 'DRD340', 'DRD350A', 'DRD350AQ', 'DRD350B', 'DRD350BQ', 'DRD350C', 'DRD350CQ', 'DRD350D', 'DRD350DQ', 'DRD350E', 'DRD350EQ', 'DRD350F', 'DRD350FQ', 'DRD350G', 'DRD350GQ', 'DRD350H', 'DRD350HQ', 'DRD350I', 'DRD350IQ', 'DRD350J', 'DRD350JQ', 'DRD350K', 'DRD360', 'DRD370A', 'DRD370AQ', 'DRD370B', 'DRD370BQ', 'DRD370C', 'DRD370CQ', 'DRD370D', 'DRD370DQ', 'DRD370E', 'DRD370EQ', 'DRD370F', 'DRD370FQ', 'DRD370G', 'DRD370GQ', 'DRD370H', 'DRD370HQ', 'DRD370I', 'DRD370IQ', 'DRD370J', 'DRD370JQ', 'DRD370K', 'DRD370KQ', 'DRD370L', 'DRD370LQ', 'DRD370M', 'DRD370MQ', 'DRD370N', 'DRD370NQ', 'DRD370O', 'DRD370OQ', 'DRD370P', 'DRD370PQ', 'DRD370Q', 'DRD370QQ', 'DRD370R', 'DRD370RQ', 'DRD370S', 'DRD370SQ', 'DRD370T', 'DRD370TQ', 'DRD370U', 'DRD370UQ', 'DRD370V'], axis=1)
+diet2_df=diet1_df.rename(columns={'SEQN':'id', 'WTDRD1':'peso1', 'WTDR2D':'peso2', 'DRQSDIET':'dieta', 'DR1TNUMF':'comidas', 'DR1TKCAL':'calorias', 'DR1TPROT':'proteinas', 'DR1TCARB':'carbohidratos', 'DR1TSUGR':'azucares', 'DR1TFIBE':'fibra', 'DR1TTFAT':'grasa', 'DR1TCHOL':'colesterol', 'DR1TATOC':'vitE', 'DR1TRET':'retinol', 'DR1TVARA':'vitA', 'DR1TACAR':'carAlf', 'DR1TBCAR':'carBet', 'DR1TVB6':'vitB6', 'DR1TFA':'acidFol', 'DR1TVB12':'vitB12', 'DR1TVC':'vitC', 'DR1TVD':'vitD', 'DR1TVK':'vitK', 'DR1TCALC':'calcio', 'DR1TPHOS':'fosforo', 'DR1TMAGN':'magnesio', 'dr1rzinc':'zinc', 'DR1TSODI':'sodio', 'DR1TPOTA':'potasio', 'DR1TSELE':'selenio', 'DR1TCAFF':'cafeina', 'DR1TALCO':'alcohol', 'DR1TMOIS':'humedad'})
+diet2_df.columns
+Out[292]: Index(['id', 'peso1', 'peso2', 'dieta', 'comidas', 'calorias', 'proteinas',
+       'carbohidratos', 'azucares', 'fibra', 'grasa', 'colesterol', 'vitE',
+       'retinol', 'vitA', 'carAlf', 'carBet', 'vitB6', 'acidFol', 'vitB12',
+       'vitC', 'vitD', 'vitK', 'calcio', 'fosforo', 'magnesio', 'DR1TZINC',
+       'sodio', 'potasio', 'selenio', 'cafeina', 'alcohol', 'humedad'],
+      dtype='object')
+#Comprobamos el porcentaje de NaNs
+diet2_df.isna().sum() * 100 / len(diet2_df)
+Out[293]: id                0.000000
+peso1             0.000000
+peso2            11.739529
+dieta            10.496280
+comidas          11.739529
+calorias         13.064302
+proteinas        13.064302
+carbohidratos    13.064302
+azucares         13.064302
+fibra            13.064302
+grasa            13.064302
+colesterol       13.064302
+vitE             13.064302
+retinol          13.064302
+vitA             13.064302
+carAlf           13.064302
+carBet           13.064302
+vitB6            13.064302
+acidFol          13.064302
+vitB12           13.064302
+vitC             13.064302
+vitD             13.064302
+vitK             13.064302
+calcio           13.064302
+fosforo          13.064302
+magnesio         13.064302
+DR1TZINC         13.064302
+sodio            13.064302
+potasio          13.064302
+selenio          13.064302
+cafeina          13.064302
+alcohol          13.064302
+humedad          13.064302
+dtype: float64
+diet2_df.columns
+Out[294]: Index(['id', 'peso1', 'peso2', 'dieta', 'comidas', 'calorias', 'proteinas',
+       'carbohidratos', 'azucares', 'fibra', 'grasa', 'colesterol', 'vitE',
+       'retinol', 'vitA', 'carAlf', 'carBet', 'vitB6', 'acidFol', 'vitB12',
+       'vitC', 'vitD', 'vitK', 'calcio', 'fosforo', 'magnesio', 'DR1TZINC',
+       'sodio', 'potasio', 'selenio', 'cafeina', 'alcohol', 'humedad'],
+      dtype='object')
+print (diet2_df)
+         id          peso1          peso2  ...  cafeina  alcohol  humedad
+0     73557   16888.327864   12930.890649  ...    203.0      0.0  2701.79
+1     73558   17932.143865   12684.148869  ...    240.0    119.0  6779.99
+2     73559   59641.812930   39394.236709  ...     45.0      0.0  3766.70
+3     73560  142203.069917  125966.366442  ...      0.0      0.0   980.45
+4     73561   59052.357033   39004.892993  ...     24.0      0.0  1029.69
+...     ...            ...            ...  ...      ...      ...      ...
+9808  83727   14146.781331   10520.302070  ...     37.0     14.0  2833.25
+9809  83728   38750.761193   51815.103262  ...      0.0      0.0  1304.06
+9810  83729   15272.505199   10401.781170  ...     12.0      0.0  2406.70
+9811  83730       0.000000            NaN  ...      NaN      NaN      NaN
+9812  83731    5805.674812    4339.132077  ...     12.0      0.0  2190.00
+
+[9813 rows x 33 columns]
+print (diet2_df.describe())
+                 id          peso1  ...      alcohol       humedad
+count   9813.000000    9813.000000  ...  8531.000000   8531.000000
+mean   78644.559971   31713.463364  ...     6.092814   2372.505209
+std     2938.592266   36061.598495  ...    22.535972   1450.749990
+min    73557.000000       0.000000  ...     0.000000    135.950000
+25%    76092.000000    8731.762120  ...     0.000000   1352.185000
+50%    78643.000000   19276.118837  ...     0.000000   2039.870000
+75%    81191.000000   42490.159621  ...     0.000000   3011.670000
+max    83731.000000  267526.890966  ...   591.400000  17350.040000
+profilediet = pandas_profiling.ProfileReport(diet2_df)
+profilediet.to_file('/dbfs/FileStore/reportdiet.html')
+display(dbutils.fs.ls("dbfs:/FileStore"))
+display(diet2_df)
+display(diet2_df)
+# Datos agrupados por dieta: se pretende analizar la influencia de la dieta en cada una de las variables nutricionales
+grouped3_data = diet2_df.groupby('dieta')
+grouped3_data.describe()
+grouped3_data.first()
+grouped3_data.mean()
